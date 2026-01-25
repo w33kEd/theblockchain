@@ -12,7 +12,7 @@ type LocalTransport struct {
 	peers     map[NetAddr]*LocalTransport
 }
 
-func NewLocalTransport(addr NetAddr) Transport {
+func NewLocalTransport(addr NetAddr) *LocalTransport {
 	return &LocalTransport{
 		addr:      addr,
 		consumeCh: make(chan RPC, 1024),
