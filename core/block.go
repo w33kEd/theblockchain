@@ -33,6 +33,8 @@ func NewBlock(h *Header, txx []Transaction) *Block {
 	}
 }
 
+// func (b *Block) Sign
+
 func (b *Block) Decode(r io.Reader, dec Decoder[*Block]) error {
 	return dec.Decode(r, b)
 }
