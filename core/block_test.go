@@ -1,10 +1,11 @@
 package core
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/w33ked/theblockchain/crypto"
 	"github.com/w33ked/theblockchain/types"
 )
 
@@ -22,7 +23,26 @@ func randomBlock(height uint32) *Block {
 
 	return NewBlock(header, []Transaction{tx})
 }
-func TestHashBlock(t *testing.T) {
+func TestSignBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
 	b := randomBlock(0)
-	fmt.Println(b.Hash(BlockHasher{}))
+	assert.Nil(t, b.Sign(privKey))
+	assert.NotNil(t, b.Signature)
+}
+
+func TestVerifyBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	b := randomBlock(0)
+
+	assert.Nil(t, b.Sign(privKey))
+	assert.Nil(t, b.Verify())
+
+	otherPrivKey := crypto.GeneratePrivateKey()
+	b.Validator = otherPrivKey.PublicKey()
+
+	assert.NotNil(t, b.Verify())
+
+	b.Height = 100
+	assert.NotNil(t, b.Verify())
+
 }
