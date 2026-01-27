@@ -13,6 +13,21 @@ func newBlockchainWithGenesis(t *testing.T) *Blockchain {
 	return bc
 }
 
+func TestAddBlock(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+
+	lenBlocks := 1000
+	for i := 0; i < lenBlocks; i++ {
+		block := randomBlockWithSignature(t, uint32(i + 1))
+		assert.Nil(t, bc.AddBlock(block))
+	}
+
+	assert.Equal(t, bc.Height(), uint32(lenBlocks))
+	assert.Equal(t, len(bc.headers), lenBlocks+1)
+
+	assert.NotNil(t, bc.AddBlock(randomBlock(89)))
+}
+
 func TestNewBlockchain(t *testing.T) {
 	bc := newBlockchainWithGenesis(t)
 	assert.NotNil(t, bc.validator)

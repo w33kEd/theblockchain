@@ -31,9 +31,7 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 		return err
 	}
 
-	bc.addBlockWithoutValidation(b)
-
-	return nil
+	return bc.addBlockWithoutValidation(b)
 }
 
 func (bc *Blockchain) Height() uint32 {
