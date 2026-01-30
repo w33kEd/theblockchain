@@ -4,31 +4,34 @@ import (
 	"crypto"
 	"fmt"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"github.com/w33ked/theblockchain/core"
 )
 
 type ServerOpts struct {
 	Transports []Transport
-	BlockTime time.Duration
+	BlockTime  time.Duration
 	PrivateKey *crypto.PrivateKey
 }
 
 type Server struct {
 	ServerOpts
-	blockTime time.Duration
-	memPool *TxPool
+	blockTime   time.Duration
+	memPool     *TxPool
 	isValidator bool
-	rpcCh  chan RPC
-	quitCh chan struct{}
+	rpcCh       chan RPC
+	quitCh      chan struct{}
 }
 
 func NewServer(opts ServerOpts) *Server {
 	return &Server{
-		ServerOpts: opts,
-		blockTime: opts.BlockTime,
-		memPool: NewTxPool(),
+		ServerOpts:  opts,
+		blockTime:   opts.BlockTime,
+		memPool:     NewTxPool(),
 		isValidator: opts.PrivateKey != nil,
-		rpcCh:      make(chan RPC),
-		quitCh:     make(chan struct{}, 1),
+		rpcCh:       make(chan RPC),
+		quitCh:      make(chan struct{}, 1),
 	}
 }
 
@@ -44,7 +47,7 @@ free:
 		case <-s.quitCh:
 			break free
 		case <-ticker.C:
-			if s.isValidator{
+			if s.isValidator {
 				s.CreateNewBlock()
 			}
 		}
@@ -56,6 +59,27 @@ free:
 func (s *Server) CreateNewBlock() error {
 	fmt.Println("creating new block")
 	return nil
+}
+
+func (s *Server) handleTransaction(tx *core.Transaction) error {
+	if err := tx.Verify(); err != nil {
+		return err
+	}
+
+	hash := tx.Hash(core.TxHasher{})
+
+	if s.memPool.Has(hash) {
+		logrus.WithFields(logrus.Fields{
+			"Hash": hash,
+		}).Info("transaction already in mempool")
+		return nil
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"Hash": hash,
+	}).Info("adding new tx to the mempool")
+
+	return s.memPool.Add(tx)
 }
 
 func (s *Server) initTransports() {

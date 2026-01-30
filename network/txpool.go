@@ -15,11 +15,9 @@ func NewTxPool() *TxPool {
 	}
 }
 
+// adds a transaction to the pool, the caller is responsible for checking if tx already exists
 func (p *TxPool) Add(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
-	if p.Has(hash) {
-		return nil
-	}
 
 	p.transactions[hash] = tx
 
