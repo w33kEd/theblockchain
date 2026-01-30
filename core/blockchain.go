@@ -2,12 +2,14 @@ package core
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
 
 type Blockchain struct {
 	store     Storage
+	lock      sync.RWMutex
 	headers   []*Header
 	validator Validator
 }
@@ -37,6 +39,9 @@ func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
 		return nil, fmt.Errorf("height (%d) too high", height)
 	}
 
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
 	return bc.headers[height], nil
 }
 
@@ -49,11 +54,16 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 }
 
 func (bc *Blockchain) Height() uint32 {
+	bc.lock.RLock()
+	defer bc.lock.RUnlock()
+
 	return uint32(len(bc.headers) - 1)
 }
 
 func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
+	bc.lock.Lock()
 	bc.headers = append(bc.headers, b.Header)
+	bc.lock.Unlock()
 
 	logrus.WithFields(logrus.Fields{
 		"height": b.Height,
