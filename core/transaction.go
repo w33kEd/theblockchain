@@ -4,12 +4,17 @@ import (
 	"fmt"
 
 	"github.com/w33ked/theblockchain/crypto"
+	"github.com/w33ked/theblockchain/types"
 )
 
 type Transaction struct {
 	Data      []byte
 	From      crypto.PublicKey
 	Signature *crypto.Signature
+}
+
+func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
+	return hasher.Hash(tx)
 }
 
 func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
