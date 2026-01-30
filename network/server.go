@@ -8,11 +8,14 @@ import (
 
 type ServerOpts struct {
 	Transports []Transport
+	BlockTime time.Duration
 	PrivateKey *crypto.PrivateKey
 }
 
 type Server struct {
 	ServerOpts
+	blockTime time.Duration
+	memPool *TxPool
 	isValidator bool
 	rpcCh  chan RPC
 	quitCh chan struct{}
@@ -21,6 +24,8 @@ type Server struct {
 func NewServer(opts ServerOpts) *Server {
 	return &Server{
 		ServerOpts: opts,
+		blockTime: opts.BlockTime,
+		memPool: NewTxPool(),
 		isValidator: opts.PrivateKey != nil,
 		rpcCh:      make(chan RPC),
 		quitCh:     make(chan struct{}, 1),
@@ -29,7 +34,7 @@ func NewServer(opts ServerOpts) *Server {
 
 func (s *Server) Start() {
 	s.initTransports()
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(s.blockTime)
 
 free:
 	for {
@@ -39,11 +44,18 @@ free:
 		case <-s.quitCh:
 			break free
 		case <-ticker.C:
-			fmt.Println("do stuff every x seconds")
+			if s.isValidator{
+				s.CreateNewBlock()
+			}
 		}
 	}
 
 	fmt.Println("Server shutdown")
+}
+
+func (s *Server) CreateNewBlock() error {
+	fmt.Println("creating new block")
+	return nil
 }
 
 func (s *Server) initTransports() {
