@@ -33,7 +33,7 @@ func TestTransactionsSorter(t *testing.T) {
 
 	for i := 0; i < txLen; i++ {
 		tx := core.NewTransaction([]byte(strconv.FormatInt(int64(i), 10)))
-		tx.SetFirstSeen(int64(i * rand.Intn(10000)))
+		tx.SetFirstSeen(int64(i * rand.Intn(1000000000000000000)))
 		assert.Nil(t, p.Add(tx))
 	}
 

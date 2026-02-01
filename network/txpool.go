@@ -57,7 +57,6 @@ func (p *TxPool) Transactions() []*core.Transaction {
 // adds a transaction to the pool, the caller is responsible for checking if tx already exists
 func (p *TxPool) Add(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
-
 	p.transactions[hash] = tx
 
 	return nil
