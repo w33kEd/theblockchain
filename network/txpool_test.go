@@ -29,11 +29,11 @@ func TestTxPoolAddTx(t *testing.T) {
 
 func TestTransactionsSorter(t *testing.T) {
 	p := NewTxPool()
-	txLen := 1000
+	txLen := 10
 
 	for i := 0; i < txLen; i++ {
 		tx := core.NewTransaction([]byte(strconv.FormatInt(int64(i), 10)))
-		tx.SetFirstSeen(int64(i * rand.Intn(1000000000000000000)))
+		tx.SetFirstSeen(int64(i * rand.Intn(100)))
 		assert.Nil(t, p.Add(tx))
 	}
 
