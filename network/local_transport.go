@@ -26,10 +26,11 @@ func (t *LocalTransport) Consume() <-chan RPC {
 }
 
 func (t *LocalTransport) Connect(tr Transport) error {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	trans := tr.(*LocalTransport)
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-	t.peers[tr.Addr()] = tr.(*LocalTransport)
+	t.peers[tr.Addr()] = trans
 
 	return nil
 }
@@ -46,6 +47,16 @@ func (t *LocalTransport) SendMessage(to NetAddr, payload []byte) error {
 	peer.consumeCh <- RPC{
 		From:    t.addr,
 		Payload: bytes.NewReader(payload),
+	}
+
+	return nil
+}
+
+func (t *LocalTransport) Broadcast(payload []byte) error {
+	for _, peer := range t.peers {
+		if err := t.SendMessage(peer.Addr(), payload); err != nil {
+			return err
+		}
 	}
 
 	return nil
