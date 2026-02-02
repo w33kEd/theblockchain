@@ -12,15 +12,15 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
-	RPCHandler RPCHandler
-	Transports []Transport
-	BlockTime  time.Duration
-	PrivateKey *crypto.PrivateKey
+	RPCDecodeFunc RPCDecodeFunc
+	RPCProcessor RPCProcessor
+	Transports    []Transport
+	BlockTime     time.Duration
+	PrivateKey    *crypto.PrivateKey
 }
 
 type Server struct {
 	ServerOpts
-	blockTime   time.Duration
 	memPool     *TxPool
 	isValidator bool
 	rpcCh       chan RPC
@@ -31,35 +31,44 @@ func NewServer(opts ServerOpts) *Server {
 	if opts.BlockTime == time.Duration(0) {
 		opts.BlockTime = defaultBlockTime
 	}
+
+	if opts.RPCDecodeFunc == nil {
+		opts.RPCDecodeFunc = DefaultRPCDEcodeFunc
+	}
+
 	s := &Server{
 		ServerOpts:  opts,
-		blockTime:   opts.BlockTime,
 		memPool:     NewTxPool(),
 		isValidator: opts.PrivateKey != nil,
 		rpcCh:       make(chan RPC),
 		quitCh:      make(chan struct{}, 1),
 	}
 
-	if opts.RPCHandler == nil {
-		opts.RPCHandler = NewDefaultRPCHandler(s)
+	// if we don't got any processor fron server opts, use server as default
+	if s.RPCProcessor == nil {
+		s.RPCProcessor = s
 	}
-
-	s.ServerOpts = opts
 
 	return s
 }
 
 func (s *Server) Start() {
 	s.initTransports()
-	ticker := time.NewTicker(s.blockTime)
+	ticker := time.NewTicker(s.BlockTime)
 
 free:
 	for {
 		select {
 		case rpc := <-s.rpcCh:
-			if err := s.RPCHandler.HandleRPC(rpc); err != nil {
+			msg, err := s.RPCDecodeFunc(rpc)
+			if err != nil {
 				logrus.Error(err)
 			}
+
+			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
+				logrus.Error(err)
+			}
+
 		case <-s.quitCh:
 			break free
 		case <-ticker.C:
@@ -77,7 +86,16 @@ func (s *Server) CreateNewBlock() error {
 	return nil
 }
 
-func (s *Server) ProcessTransaction(from NetAddr, tx *core.Transaction) error {
+func (s *Server) ProcessMessage(msg *DecodedMessage) error {
+	switch t := msg.Data.(type){
+	case *core.Transaction:
+			return s.processTransaction(t)
+	}
+
+	return nil
+}
+
+func (s *Server) processTransaction(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
 
 	if s.memPool.Has(hash) {
@@ -97,6 +115,8 @@ func (s *Server) ProcessTransaction(from NetAddr, tx *core.Transaction) error {
 		"Hash":           hash,
 		"mempool length": s.memPool.Len(),
 	}).Info("adding new tx to the mempool")
+
+	// TODO: broadcast tx to peers
 
 	return s.memPool.Add(tx)
 }
