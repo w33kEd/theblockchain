@@ -34,7 +34,10 @@ func main() {
 		}
 	}()
 
+	privKey := crypto.GeneratePrivateKey()
 	opts := network.ServerOpts{
+		PrivateKey: &privKey,
+		ID:         "LOCAL",
 		Transports: []network.Transport{trLocal},
 	}
 
@@ -44,7 +47,7 @@ func main() {
 
 func sendTransaction(tr network.Transport, to network.NetAddr) error {
 	privKey := crypto.GeneratePrivateKey()
-	data := []byte(strconv.FormatInt(int64(rand.Intn(10)), 10))
+	data := []byte(strconv.FormatInt(int64(rand.Intn(1000)), 10))
 	tx := core.NewTransaction(data)
 	tx.Sign(privKey)
 
