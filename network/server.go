@@ -151,6 +151,10 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	return s.memPool.Add(tx)
 }
 
+func (s *Server) broadcastBlock(b *core.Block) error {
+	return nil
+}
+
 func (s *Server) broadcastTx(tx *core.Transaction) error {
 	buf := &bytes.Buffer{}
 	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
@@ -206,7 +210,7 @@ func genesisBlock() *core.Block {
 		Version:   1,
 		DataHash:  types.Hash{},
 		Height:    0,
-		Timestamp: time.Now().UnixNano(),
+		Timestamp: 000000,
 	}
 
 	b, _ := core.NewBlock(header, nil)
