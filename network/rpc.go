@@ -47,7 +47,7 @@ type DecodedMessage struct {
 
 type RPCDecodeFunc func(RPC) (*DecodedMessage, error)
 
-func DefaultRPCDEcodeFunc(rpc RPC) (*DecodedMessage, error) {
+func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 	msg := Message{}
 	if err := gob.NewDecoder(rpc.Payload).Decode(&msg); err != nil {
 		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
