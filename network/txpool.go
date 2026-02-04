@@ -3,8 +3,8 @@ package network
 import (
 	"sync"
 
-	"github.com/anthdm/projectx/core"
-	"github.com/anthdm/projectx/types"
+	"github.com/w33ked/theblockchain/core"
+	"github.com/w33ked/theblockchain/types"
 )
 
 type TxPool struct {

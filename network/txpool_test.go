@@ -3,9 +3,9 @@ package network
 import (
 	"testing"
 
-	"github.com/anthdm/projectx/core"
-	"github.com/anthdm/projectx/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/w33ked/theblockchain/core"
+	"github.com/w33ked/theblockchain/util"
 )
 
 func TestTxMaxLength(t *testing.T) {

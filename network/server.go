@@ -5,10 +5,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/anthdm/projectx/core"
-	"github.com/anthdm/projectx/crypto"
-	"github.com/anthdm/projectx/types"
 	"github.com/go-kit/log"
+	"github.com/w33ked/theblockchain/core"
+	"github.com/w33ked/theblockchain/crypto"
+	"github.com/w33ked/theblockchain/types"
 )
 
 var defaultBlockTime = 5 * time.Second

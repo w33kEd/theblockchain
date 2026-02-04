@@ -3,8 +3,8 @@ package core
 import (
 	"fmt"
 
-	"github.com/anthdm/projectx/crypto"
-	"github.com/anthdm/projectx/types"
+	"github.com/w33ked/theblockchain/crypto"
+	"github.com/w33ked/theblockchain/types"
 )
 
 type Transaction struct {

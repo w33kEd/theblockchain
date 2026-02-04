@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anthdm/projectx/core"
-	"github.com/anthdm/projectx/crypto"
-	"github.com/anthdm/projectx/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/w33ked/theblockchain/core"
+	"github.com/w33ked/theblockchain/crypto"
+	"github.com/w33ked/theblockchain/types"
 )
 
 func RandomBytes(size int) []byte {
