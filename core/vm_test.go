@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,14 +15,20 @@ func TestVM(t *testing.T) {
 	// add
 	// 3
 	// push stack
-	data := []byte{0x09, 0x0a, 0x02, 0x0a, 0x0b}
+	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d}
 	vm := NewVM(data)
 	assert.Nil(t, vm.Run())
+	// result := vm.stack.Pop()
+	// assert.Equal(t, 11, result)
+	value := vm.stack.Pop().([]byte)
+	assert.Equal(t, "FOO", string(value))
 
-	fmt.Println(vm.stack.data)
+	data = []byte{0x09, 0x0a, 0x02, 0x0a, 0x0e}
+	vm = NewVM(data)
+	assert.Nil(t, vm.Run())
+	result := vm.stack.Pop().(int)
+	assert.Equal(t, 7, result)
 
-	result := vm.stack.Pop()
-	assert.Equal(t, 11, result)
 }
 
 func TestStack(t *testing.T) {
