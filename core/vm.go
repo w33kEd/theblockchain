@@ -3,23 +3,48 @@ package core
 type Instruction byte
 
 const (
-	InstrPush Instruction = 0x0a // 10
-	InstrAdd  Instruction = 0x0b // 11
+	InstrPushInt Instruction = 0x0a // 10
+	InstrAdd     Instruction = 0x0b // 11
 )
+
+type Stack struct {
+	data []any // interface{}
+	sp   int   // stack pointer
+}
 
 type VM struct {
 	data  []byte
 	ip    int // instruction pointer
-	stack []byte
-	sp    int //stack pointer
+	stack *Stack
+}
+
+func NewStack(size int) *Stack {
+	return &Stack{
+		data: make([]any, size),
+		sp:   0,
+	}
+}
+
+func (s *Stack) Push(v any) {
+	// push a value then increment the pointer
+	s.data[s.sp] = v
+	s.sp++
+}
+
+func (s *Stack) Pop() any {
+	value := s.data[0]
+
+	s.data = append(s.data[:0], s.data[1:]...)
+	s.sp--
+
+	return value
 }
 
 func NewVM(data []byte) *VM {
 	return &VM{
 		data:  data,
 		ip:    0,
-		stack: make([]byte, 1024),
-		sp:    -1,
+		stack: NewStack(128),
 	}
 }
 
@@ -43,19 +68,14 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
-	case InstrPush:
-		vm.pushStack(vm.data[vm.ip-1])
+	case InstrPushInt:
+		vm.stack.Push(int(vm.data[vm.ip-1]))
 	case InstrAdd:
-		a := vm.stack[0]
-		b := vm.stack[1]
+		a := vm.stack.Pop().(int)
+		b := vm.stack.Pop().(int)
 		c := a + b
-		vm.pushStack(c)
+		vm.stack.Push(c)
 	}
 
 	return nil
-}
-
-func (vm *VM) pushStack(b byte) {
-	vm.sp++
-	vm.stack[vm.sp] = b
 }
