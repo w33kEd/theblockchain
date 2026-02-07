@@ -13,6 +13,7 @@ const (
 	InstrPack     Instruction = 0x0d
 	InstrSub      Instruction = 0x0e
 	InstrStore    Instruction = 0x0f
+	InstrGet      Instruction = 0xae
 )
 
 type Stack struct {
@@ -57,6 +58,15 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
+	case InstrGet:
+		key := vm.stack.Pop().([]byte)
+
+		value, err := vm.contractState.Get(key)
+		if err != nil {
+			return err
+		}
+
+		vm.stack.Push(value)
 	case InstrStore:
 		var (
 			key             = vm.stack.Pop().([]byte)
@@ -116,7 +126,8 @@ func NewStack(size int) *Stack {
 
 func (s *Stack) Push(v any) {
 	// push a value then increment the pointer
-	s.data[s.sp] = v
+	s.data = append([]any{v}, s.data...)
+	// s.data[s.sp] = v
 	s.sp++
 }
 

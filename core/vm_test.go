@@ -6,20 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVM(t *testing.T) {
-	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f}
-
-	contractState := NewState()
-	vm := NewVM(data, contractState)
-
-	assert.Nil(t, vm.Run())
-
-	valueBytes, err := contractState.Get([]byte("FOO"))
-	value := deserializeInt64(valueBytes)
-	assert.Nil(t, err)
-	assert.Equal(t, value, int64(5))
-}
-
 func TestStack(t *testing.T) {
 	s := NewStack(128)
 
@@ -27,9 +13,36 @@ func TestStack(t *testing.T) {
 	s.Push(2)
 
 	value := s.Pop()
-	assert.Equal(t, value, 1)
+	assert.Equal(t, value, 2)
 
 	value = s.Pop()
-	assert.Equal(t, value, 2)
+	assert.Equal(t, value, 1)
+}
+
+// 2 + 3
+// FOO - make key
+// FOO = 5
+
+func TestVM(t *testing.T) {
+	data := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0x0f}
+	pushFoo := []byte{0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0xae}
+
+	data = append(data, pushFoo...)
+
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+
+	assert.Nil(t, vm.Run())
+
+	value := vm.stack.Pop().([]byte)
+	// fmt.Printf("%+v", value)
+	valueSerialized := deserializeInt64(value)
+
+	assert.Equal(t, valueSerialized, int64(5))
+
+	// valueBytes, err := contractState.Get([]byte("FOO"))
+	// value := deserializeInt64(valueBytes)
+	// assert.Nil(t, err)
+	// assert.Equal(t, value, int64(5))
 
 }
