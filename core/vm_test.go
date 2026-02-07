@@ -31,7 +31,6 @@ func TestVM(t *testing.T) {
 
 	contractState := NewState()
 	vm := NewVM(data, contractState)
-
 	assert.Nil(t, vm.Run())
 
 	value := vm.stack.Pop().([]byte)
@@ -45,4 +44,24 @@ func TestVM(t *testing.T) {
 	// assert.Nil(t, err)
 	// assert.Equal(t, value, int64(5))
 
+}
+
+func TestMul(t *testing.T) {
+	data := []byte{0x02, 0x0a, 0x02, 0x0a, 0xea}
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+	assert.Nil(t, vm.Run())
+
+	result := vm.stack.Pop().(int)
+	assert.Equal(t, result, 4)
+}
+
+func TestDiv(t *testing.T) {
+	data := []byte{0x04, 0x0a, 0x02, 0x0a, 0xfd}
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+	assert.Nil(t, vm.Run())
+
+	result := vm.stack.Pop().(int)
+	assert.Equal(t, result, 2)
 }

@@ -14,6 +14,8 @@ const (
 	InstrSub      Instruction = 0x0e
 	InstrStore    Instruction = 0x0f
 	InstrGet      Instruction = 0xae
+	InstrMul      Instruction = 0xea
+	InstrDiv      Instruction = 0xfd
 )
 
 type Stack struct {
@@ -88,12 +90,6 @@ func (vm *VM) Exec(instr Instruction) error {
 	case InstrPushByte:
 		vm.stack.Push(byte(vm.data[vm.ip-1]))
 
-	case InstrAdd:
-		a := vm.stack.Pop().(int)
-		b := vm.stack.Pop().(int)
-		c := a + b
-		vm.stack.Push(c)
-
 	case InstrPack:
 		n := vm.stack.Pop().(int)
 
@@ -105,11 +101,28 @@ func (vm *VM) Exec(instr Instruction) error {
 
 		vm.stack.Push(b)
 
+	case InstrAdd:
+		a := vm.stack.Pop().(int)
+		b := vm.stack.Pop().(int)
+		c := a + b
+		vm.stack.Push(c)
+
 	case InstrSub:
 		a := vm.stack.Pop().(int)
 		b := vm.stack.Pop().(int)
 		c := a - b
 		vm.stack.Push(c)
+	case InstrMul:
+		a := vm.stack.Pop().(int)
+		b := vm.stack.Pop().(int)
+		c := a * b
+		vm.stack.Push(c)
+	case InstrDiv:
+		b := vm.stack.Pop().(int)
+		a := vm.stack.Pop().(int)
+		c := a / b
+		vm.stack.Push(c)
+
 	}
 
 	return nil
