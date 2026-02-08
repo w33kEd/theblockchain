@@ -2,6 +2,8 @@ package network
 
 import (
 	"bytes"
+	"encoding/gob"
+	"fmt"
 	"os"
 	"time"
 
@@ -15,6 +17,7 @@ var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
 	ID            string
+	Transport     Transport
 	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
 	RPCProcessor  RPCProcessor
@@ -41,7 +44,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	}
 	if opts.Logger == nil {
 		opts.Logger = log.NewLogfmtLogger(os.Stderr)
-		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
+		opts.Logger = log.With(opts.Logger, "addr", opts.Transport.Addr())
 	}
 
 	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
@@ -67,6 +70,8 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		go s.validatorLoop()
 	}
 
+	s.boostrapNodes()
+
 	return s, nil
 }
 
@@ -83,7 +88,9 @@ free:
 			}
 
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
-				s.Logger.Log("error", err)
+				if err != core.ErrBlockKnown {
+					s.Logger.Log("error", err)
+				}
 			}
 
 		case <-s.quitCh:
@@ -92,6 +99,22 @@ free:
 	}
 
 	s.Logger.Log("msg", "Server is shutting down")
+}
+
+func (s *Server) boostrapNodes() {
+	for _, tr := range s.Transports {
+		if s.Transport.Addr() != tr.Addr() {
+			if err := s.Transport.Connect(tr); err != nil {
+				s.Logger.Log("error", "could not connect to remote", "err", err)
+			}
+			s.Logger.Log("msg", "connect to remote", "we", s.Transport.Addr(), "addr", tr.Addr())
+
+			// Send the getStatusMessage so we can sync (if needed)
+			if err := s.sendGetStatusMessage(tr); err != nil {
+				s.Logger.Log("error", "sendGetStatusMessage", "err", err)
+			}
+		}
+	}
 }
 
 func (s *Server) validatorLoop() {
@@ -111,6 +134,38 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 		return s.processTransaction(t)
 	case *core.Block:
 		return s.processBlock(t)
+	case *GetStatusMessage:
+		return s.processGetStatusMessage(msg.From, t)
+	case *StatusMessage:
+		return s.processStatusMessage(msg.From, t)
+	case *GetBlocksMessage:
+		return s.processGetBlocksMessage(msg.From, t)
+	}
+
+	return nil
+}
+
+func (s *Server) processGetBlocksMessage(from NetAddr, data *GetBlocksMessage) error {
+	panic("here")
+	fmt.Printf("got get blocks message => %+v\n", data)
+
+	return nil
+}
+
+// TODO(@anthdm): Remove the logic from the main function to here
+// Normally Transport which is our own transport should do the trick.
+func (s *Server) sendGetStatusMessage(tr Transport) error {
+	var (
+		getStatusMsg = new(GetStatusMessage)
+		buf          = new(bytes.Buffer)
+	)
+	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeGetStatus, buf.Bytes())
+	if err := s.Transport.SendMessage(tr.Addr(), msg.Bytes()); err != nil {
+		return err
 	}
 
 	return nil
@@ -125,10 +180,51 @@ func (s *Server) broadcast(payload []byte) error {
 	return nil
 }
 
+func (s *Server) processStatusMessage(from NetAddr, data *StatusMessage) error {
+	if data.CurrentHeight <= s.chain.Height() {
+		s.Logger.Log("msg", "cannot sync blockHeight to low", "ourHeight", s.chain.Height(), "theirHeight", data.CurrentHeight, "addr", from)
+		return nil
+	}
+
+	// In this case we are 100% sure that the node has blocks heigher than us.
+	getBlocksMessage := &GetBlocksMessage{
+		From: s.chain.Height(),
+		To:   0,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
+
+	return s.Transport.SendMessage(from, msg.Bytes())
+}
+
+func (s *Server) processGetStatusMessage(from NetAddr, data *GetStatusMessage) error {
+	fmt.Printf("=> received Getstatus msg from %s => %+v\n", from, data)
+
+	statusMessage := &StatusMessage{
+		CurrentHeight: s.chain.Height(),
+		ID:            s.ID,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(statusMessage); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeStatus, buf.Bytes())
+
+	return s.Transport.SendMessage(from, msg.Bytes())
+}
+
 func (s *Server) processBlock(b *core.Block) error {
 	if err := s.chain.AddBlock(b); err != nil {
 		return err
 	}
+
 	go s.broadcastBlock(b)
 
 	return nil
@@ -215,7 +311,7 @@ func (s *Server) createNewBlock() error {
 		return err
 	}
 
-	// TODO: pending pool of tx should only reflect on validator nodes.
+	// TODO(@anthdm): pending pool of tx should only reflect on validator nodes.
 	// Right now "normal nodes" does not have their pending pool cleared.
 	s.mempool.ClearPending()
 
