@@ -1,66 +1,48 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
-	"fmt"
 	"log"
+	"net"
 	"time"
 
-	"github.com/w33ked/theblockchain/core"
 	"github.com/w33ked/theblockchain/crypto"
 	"github.com/w33ked/theblockchain/network"
 )
 
-var transports = []network.Transport{
-	network.NewLocalTransport("LOCAL"),
-	// network.NewLocalTransport("REMOTE_B"),
-	// network.NewLocalTransport("REMOTE_C"),
-}
-
 func main() {
-	initRemoteServers(transports)
-	localNode := transports[0]
-	trLate := network.NewLocalTransport("LATE_NODE")
-	// remoteNodeA := transports[1]
-	// remoteNodeC := transports[3]
-
-	// go func() {
-	// 	for {
-	// 		if err := sendTransaction(remoteNodeA, localNode.Addr()); err != nil {
-	// 			logrus.Error(err)
-	// 		}
-	// 		time.Sleep(2 * time.Second)
-	// 	}
-	// }()
-
-	go func() {
-		time.Sleep(7 * time.Second)
-		lateServer := makeServer(string(trLate.Addr()), trLate, nil)
-		go lateServer.Start()
-	}()
-
 	privKey := crypto.GeneratePrivateKey()
-	localServer := makeServer("LOCAL", localNode, &privKey)
-	localServer.Start()
+	localNode := makeServer("LOCAL_NODE", &privKey)
+
+	go localNode.Start()
+
+	time.Sleep(1 * time.Second)
+
+	for i := 0; i < 10; i++ {
+		go tcpTester()
+	}
+
+	select {}
 }
 
-func initRemoteServers(trs []network.Transport) {
-	for i := 0; i < len(trs); i++ {
-		id := fmt.Sprintf("REMOTE_%d", i)
-		s := makeServer(id, trs[i], nil)
-		go s.Start()
+func tcpTester() {
+	conn, err := net.Dial("tcp", ":3000")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = conn.Write([]byte("hello blocky"))
+	if err != nil {
+		panic(err)
 	}
 }
 
-func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network.Server {
+func makeServer(id string, pk *crypto.PrivateKey) *network.Server {
+
 	opts := network.ServerOpts{
-		Transport:  tr,
-		PrivateKey: pk,
-		ID:         id,
-		Transports: transports,
+		ListenAddr: ":3000",
+		PrivateKey:   pk,
+		ID:           id,
 	}
-
 	s, err := network.NewServer(opts)
 	if err != nil {
 		log.Fatal(err)
@@ -69,32 +51,73 @@ func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network
 	return s
 }
 
-func sendGetStatusMessage(tr network.Transport, to network.NetAddr) error {
-	var (
-		getStatusMsg = new(network.GetStatusMessage)
-		buf          = new(bytes.Buffer)
-	)
+// var transports = []network.Transport{
+// 	network.NewLocalTransport("LOCAL"),
+// 	// network.NewLocalTransport("REMOTE_B"),
+// 	// network.NewLocalTransport("REMOTE_C"),
+// }
 
-	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
-		return err
-	}
-	msg := network.NewMessage(network.MessageTypeGetStatus, buf.Bytes())
+// func main() {
+// 	initRemoteServers(transports)
+// 	localNode := transports[0]
+// 	trLate := network.NewLocalTransport("LATE_NODE")
+// 	// remoteNodeA := transports[1]
+// 	// remoteNodeC := transports[3]
 
-	return tr.SendMessage(to, msg.Bytes())
-}
+// 	// go func() {
+// 	// 	for {
+// 	// 		if err := sendTransaction(remoteNodeA, localNode.Addr()); err != nil {
+// 	// 			logrus.Error(err)
+// 	// 		}
+// 	// 		time.Sleep(2 * time.Second)
+// 	// 	}
+// 	// }()
 
-func sendTransaction(tr network.Transport, to network.NetAddr) error {
-	privKey := crypto.GeneratePrivateKey()
-	// data := []byte{0x03, 0x0a, 0x02, 0x0a, 0x0e}
-	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f}
-	tx := core.NewTransaction(data)
-	tx.Sign(privKey)
-	buf := &bytes.Buffer{}
-	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
-		return err
-	}
+// 	go func() {
+// 		time.Sleep(7 * time.Second)
+// 		lateServer := makeServer(string(trLate.Addr()), trLate, nil)
+// 		go lateServer.Start()
+// 	}()
 
-	msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
+// 	privKey := crypto.GeneratePrivateKey()
+// 	localServer := makeServer("LOCAL", localNode, &privKey)
+// 	localServer.Start()
+// }
 
-	return tr.SendMessage(to, msg.Bytes())
-}
+// func initRemoteServers(trs []network.Transport) {
+// 	for i := 0; i < len(trs); i++ {
+// 		id := fmt.Sprintf("REMOTE_%d", i)
+// 		s := makeServer(id, trs[i], nil)
+// 		go s.Start()
+// 	}
+// }
+
+// func sendGetStatusMessage(tr network.Transport, to network.NetAddr) error {
+// 	var (
+// 		getStatusMsg = new(network.GetStatusMessage)
+// 		buf          = new(bytes.Buffer)
+// 	)
+
+// 	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+// 		return err
+// 	}
+// 	msg := network.NewMessage(network.MessageTypeGetStatus, buf.Bytes())
+
+// 	return tr.SendMessage(to, msg.Bytes())
+// }
+
+// func sendTransaction(tr network.Transport, to network.NetAddr) error {
+// 	privKey := crypto.GeneratePrivateKey()
+// 	// data := []byte{0x03, 0x0a, 0x02, 0x0a, 0x0e}
+// 	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f}
+// 	tx := core.NewTransaction(data)
+// 	tx.Sign(privKey)
+// 	buf := &bytes.Buffer{}
+// 	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
+// 		return err
+// 	}
+
+// 	msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
+
+// 	return tr.SendMessage(to, msg.Bytes())
+// }
