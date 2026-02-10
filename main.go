@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"net"
+	"time"
 
 	"github.com/w33ked/theblockchain/core"
 	"github.com/w33ked/theblockchain/crypto"
@@ -21,13 +22,11 @@ func main() {
 	remoteNodeB := makeServer("REMOTE_NODE_B", nil, ":5000", nil)
 	go remoteNodeB.Start()
 
+	time.Sleep(1 * time.Second)
+
+	go tcpTester()
+
 	select {}
-
-	// time.Sleep(1 * time.Second)
-
-	// go tcpTester()
-
-	// select {}
 }
 
 func tcpTester() {
@@ -56,7 +55,7 @@ func tcpTester() {
 func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []string) *network.Server {
 
 	opts := network.ServerOpts{
-		SeedNodes: seedNodes,
+		SeedNodes:  seedNodes,
 		ListenAddr: addr,
 		PrivateKey: pk,
 		ID:         id,

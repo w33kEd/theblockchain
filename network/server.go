@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-kit/log"
@@ -30,7 +31,10 @@ type ServerOpts struct {
 type Server struct {
 	TCPTransport *TCPTransport
 	peerCh       chan *TCPPeer
-	peerMap      map[net.Addr]*TCPPeer
+
+	mu      sync.RWMutex
+	peerMap map[net.Addr]*TCPPeer
+
 	ServerOpts
 	mempool     *TxPool
 	chain       *core.Blockchain
@@ -97,7 +101,7 @@ func (s *Server) bootstrapNetwork() {
 				fmt.Printf("could not connect to %+v\n", conn)
 				return
 			}
-	
+
 			s.peerCh <- &TCPPeer{
 				conn: conn,
 			}
@@ -119,10 +123,8 @@ free:
 	for {
 		select {
 		case peer := <-s.peerCh:
-			// TODO: add mutex
-
 			s.peerMap[peer.conn.RemoteAddr()] = peer
-			
+
 			go peer.readLoop(s.rpcCh)
 			fmt.Printf("New Peer: %+v\n", peer)
 
@@ -202,6 +204,8 @@ func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) 
 // }
 
 func (s *Server) broadcast(payload []byte) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for netAddr, peer := range s.peerMap {
 		if err := peer.Send(payload); err != nil {
 			fmt.Printf("peer send error => addr %s [err: %s]\n", netAddr, err)
