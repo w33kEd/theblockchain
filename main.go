@@ -1,27 +1,33 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"net"
-	"time"
 
+	"github.com/w33ked/theblockchain/core"
 	"github.com/w33ked/theblockchain/crypto"
 	"github.com/w33ked/theblockchain/network"
 )
 
 func main() {
 	privKey := crypto.GeneratePrivateKey()
-	localNode := makeServer("LOCAL_NODE", &privKey)
-
+	localNode := makeServer("LOCAL_NODE", &privKey, ":3000", []string{":4000", "5000"})
 	go localNode.Start()
 
-	time.Sleep(1 * time.Second)
+	remoteNode := makeServer("REMOTE_NODE", nil, ":4000", []string{":5000"})
+	go remoteNode.Start()
 
-	for i := 0; i < 10; i++ {
-		go tcpTester()
-	}
+	remoteNodeB := makeServer("REMOTE_NODE_B", nil, ":5000", nil)
+	go remoteNodeB.Start()
 
 	select {}
+
+	// time.Sleep(1 * time.Second)
+
+	// go tcpTester()
+
+	// select {}
 }
 
 func tcpTester() {
@@ -29,19 +35,31 @@ func tcpTester() {
 	if err != nil {
 		panic(err)
 	}
+	privKey := crypto.GeneratePrivateKey()
+	// data := []byte{0x03, 0x0a, 0x02, 0x0a, 0x0e}
+	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f}
+	tx := core.NewTransaction(data)
+	tx.Sign(privKey)
+	buf := &bytes.Buffer{}
+	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
+		panic(err)
+	}
 
-	_, err = conn.Write([]byte("hello blocky"))
+	msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
+
+	_, err = conn.Write(msg.Bytes())
 	if err != nil {
 		panic(err)
 	}
 }
 
-func makeServer(id string, pk *crypto.PrivateKey) *network.Server {
+func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []string) *network.Server {
 
 	opts := network.ServerOpts{
-		ListenAddr: ":3000",
-		PrivateKey:   pk,
-		ID:           id,
+		SeedNodes: seedNodes,
+		ListenAddr: addr,
+		PrivateKey: pk,
+		ID:         id,
 	}
 	s, err := network.NewServer(opts)
 	if err != nil {

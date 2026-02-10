@@ -16,7 +16,8 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
-	ListenAddr string
+	SeedNodes     []string
+	ListenAddr    string
 	TCPTransport  *TCPTransport
 	ID            string
 	Logger        log.Logger
@@ -28,8 +29,8 @@ type ServerOpts struct {
 
 type Server struct {
 	TCPTransport *TCPTransport
-	peerCh  chan *TCPPeer
-	peerMap map[net.Addr]*TCPPeer
+	peerCh       chan *TCPPeer
+	peerMap      map[net.Addr]*TCPPeer
 	ServerOpts
 	mempool     *TxPool
 	chain       *core.Blockchain
@@ -47,7 +48,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	}
 	if opts.Logger == nil {
 		opts.Logger = log.NewLogfmtLogger(os.Stderr)
-		// opts.Logger = log.With(opts.Logger, "addr", opts.Transport.Addr())
+		opts.Logger = log.With(opts.Logger, "addr", opts.ID)
 	}
 
 	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
@@ -60,14 +61,14 @@ func NewServer(opts ServerOpts) (*Server, error) {
 
 	s := &Server{
 		TCPTransport: tr,
-		peerCh:      peerCh,
-		peerMap:     make(map[net.Addr]*TCPPeer),
-		ServerOpts:  opts,
-		chain:       chain,
-		mempool:     NewTxPool(1000),
-		isValidator: opts.PrivateKey != nil,
-		rpcCh:       make(chan RPC),
-		quitCh:      make(chan struct{}, 1),
+		peerCh:       peerCh,
+		peerMap:      make(map[net.Addr]*TCPPeer),
+		ServerOpts:   opts,
+		chain:        chain,
+		mempool:      NewTxPool(1000),
+		isValidator:  opts.PrivateKey != nil,
+		rpcCh:        make(chan RPC),
+		quitCh:       make(chan struct{}, 1),
 	}
 
 	s.TCPTransport.peerCh = peerCh
@@ -85,19 +86,51 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	return s, nil
 }
 
+func (s *Server) bootstrapNetwork() {
+	for _, addr := range s.SeedNodes {
+
+		fmt.Println("Trying to connect to ", addr)
+
+		go func(addr string) {
+			conn, err := net.Dial("tcp", addr)
+			if err != nil {
+				fmt.Printf("could not connect to %+v\n", conn)
+				return
+			}
+	
+			s.peerCh <- &TCPPeer{
+				conn: conn,
+			}
+		}(addr)
+	}
+}
+
 func (s *Server) Start() {
 
 	s.TCPTransport.Start()
+
+	time.Sleep(1 * time.Second)
+
+	s.bootstrapNetwork()
+
+	s.Logger.Log("msg", "acceptingTCP connections on", "addr", s.ListenAddr, "id", s.ID)
 
 free:
 	for {
 		select {
 		case peer := <-s.peerCh:
+			// TODO: add mutex
+
+			s.peerMap[peer.conn.RemoteAddr()] = peer
+			
+			go peer.readLoop(s.rpcCh)
 			fmt.Printf("New Peer: %+v\n", peer)
+
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {
 				s.Logger.Log("error", err)
+				continue
 			}
 
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
@@ -142,7 +175,7 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 	return nil
 }
 
-func (s *Server) processGetBlocksMessage(from NetAddr, data *GetBlocksMessage) error {
+func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) error {
 	panic("here")
 	fmt.Printf("got get blocks message => %+v\n", data)
 
@@ -169,11 +202,11 @@ func (s *Server) processGetBlocksMessage(from NetAddr, data *GetBlocksMessage) e
 // }
 
 func (s *Server) broadcast(payload []byte) error {
-	// for _, tr := range s.Transports {
-	// 	if err := tr.Broadcast(payload); err != nil {
-	// 		return err
-	// 	}
-	// }
+	for netAddr, peer := range s.peerMap {
+		if err := peer.Send(payload); err != nil {
+			fmt.Printf("peer send error => addr %s [err: %s]\n", netAddr, err)
+		}
+	}
 	return nil
 }
 

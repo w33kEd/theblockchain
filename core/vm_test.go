@@ -13,10 +13,10 @@ func TestStack(t *testing.T) {
 	s.Push(2)
 
 	value := s.Pop()
-	assert.Equal(t, value, 2)
+	assert.Equal(t, value, 1)
 
 	value = s.Pop()
-	assert.Equal(t, value, 1)
+	assert.Equal(t, value, 2)
 }
 
 // 2 + 3

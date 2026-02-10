@@ -1,4 +1,5 @@
 package core
+
 import (
 	"encoding/binary"
 )
@@ -12,14 +13,31 @@ const (
 	InstrPack     Instruction = 0x0d
 	InstrSub      Instruction = 0x0e
 	InstrStore    Instruction = 0x0f
-	InstrGet      Instruction = 0xae
-	InstrMul      Instruction = 0xea
-	InstrDiv      Instruction = 0xfd
 )
 
 type Stack struct {
-	data []any // interface{}
-	sp   int   // stack pointer
+	data []any
+	sp   int
+}
+
+func NewStack(size int) *Stack {
+	return &Stack{
+		data: make([]any, size),
+		sp:   0,
+	}
+}
+
+func (s *Stack) Push(v any) {
+	s.data[s.sp] = v
+	s.sp++
+}
+
+func (s *Stack) Pop() any {
+	value := s.data[0]
+	s.data = append(s.data[:0], s.data[1:]...)
+	s.sp--
+
+	return value
 }
 
 type VM struct {
@@ -29,7 +47,6 @@ type VM struct {
 	contractState *State
 }
 
-// vm operations
 func NewVM(data []byte, contractState *State) *VM {
 	return &VM{
 		contractState: contractState,
@@ -59,21 +76,13 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
-	case InstrGet:
-		key := vm.stack.Pop().([]byte)
-
-		value, err := vm.contractState.Get(key)
-		if err != nil {
-			return err
-		}
-
-		vm.stack.Push(value)
 	case InstrStore:
 		var (
 			key             = vm.stack.Pop().([]byte)
 			value           = vm.stack.Pop()
 			serializedValue []byte
 		)
+
 		switch v := value.(type) {
 		case int:
 			serializedValue = serializeInt64(int64(v))
@@ -91,7 +100,6 @@ func (vm *VM) Exec(instr Instruction) error {
 
 	case InstrPack:
 		n := vm.stack.Pop().(int)
-
 		b := make([]byte, n)
 
 		for i := 0; i < n; i++ {
@@ -100,56 +108,20 @@ func (vm *VM) Exec(instr Instruction) error {
 
 		vm.stack.Push(b)
 
-	case InstrAdd:
-		a := vm.stack.Pop().(int)
-		b := vm.stack.Pop().(int)
-		c := a + b
-		vm.stack.Push(c)
-
 	case InstrSub:
 		a := vm.stack.Pop().(int)
 		b := vm.stack.Pop().(int)
 		c := a - b
 		vm.stack.Push(c)
-	case InstrMul:
-		a := vm.stack.Pop().(int)
-		b := vm.stack.Pop().(int)
-		c := a * b
-		vm.stack.Push(c)
-	case InstrDiv:
-		b := vm.stack.Pop().(int)
-		a := vm.stack.Pop().(int)
-		c := a / b
-		vm.stack.Push(c)
 
+	case InstrAdd:
+		a := vm.stack.Pop().(int)
+		b := vm.stack.Pop().(int)
+		c := a + b
+		vm.stack.Push(c)
 	}
 
 	return nil
-}
-
-// stack operations
-
-func NewStack(size int) *Stack {
-	return &Stack{
-		data: make([]any, size),
-		sp:   0,
-	}
-}
-
-func (s *Stack) Push(v any) {
-	// push a value then increment the pointer
-	s.data = append([]any{v}, s.data...)
-	// s.data[s.sp] = v
-	s.sp++
-}
-
-func (s *Stack) Pop() any {
-	value := s.data[0]
-
-	s.data = append(s.data[:0], s.data[1:]...)
-	s.sp--
-
-	return value
 }
 
 func serializeInt64(value int64) []byte {
