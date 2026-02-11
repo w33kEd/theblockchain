@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -22,8 +23,9 @@ const (
 	MessageTypeTx        MessageType = 0x1
 	MessageTypeBlock     MessageType = 0x2
 	MessageTypeGetBlocks MessageType = 0x3
-	MessageTypeStatus    MessageType = 0x04
-	MessageTypeGetStatus MessageType = 0x05
+	MessageTypeStatus    MessageType = 0x4
+	MessageTypeGetStatus MessageType = 0x5
+	MessageTypeBlocks    MessageType = 0x6
 )
 
 type Message struct {
@@ -84,9 +86,10 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			Data: block,
 		}, nil
 	case MessageTypeGetStatus:
+		getStatusMessage := new(GetStatusMessage)
 		return &DecodedMessage{
 			From: rpc.From,
-			Data: nil,
+			Data: getStatusMessage,
 		}, nil
 	case MessageTypeStatus:
 		statusMessage := new(StatusMessage)
@@ -98,6 +101,26 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: statusMessage,
 		}, nil
+	case MessageTypeGetBlocks:
+		getBlocks := new(GetBlocksMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(getBlocks); err != nil {
+			return nil, err
+		}
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: getBlocks,
+		}, nil
+	case MessageTypeBlocks:
+		blocks := new(BlocksMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(blocks); err != nil {
+			return nil, err
+		}
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: blocks,
+		}, nil
 	default:
 		return nil, fmt.Errorf("Invalid message header %x", msg.Header)
 	}
@@ -105,4 +128,9 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 
 type RPCProcessor interface {
 	ProcessMessage(*DecodedMessage) error
+}
+
+func init() {
+	gob.Register(elliptic.P256())
+
 }

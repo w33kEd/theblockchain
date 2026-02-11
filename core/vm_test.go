@@ -57,11 +57,11 @@ func TestMul(t *testing.T) {
 }
 
 func TestDiv(t *testing.T) {
-	data := []byte{0x04, 0x0a, 0x02, 0x0a, 0xfd}
+	data := []byte{0x04, 0x0a, 0x04, 0x0a, 0xfd}
 	contractState := NewState()
 	vm := NewVM(data, contractState)
 	assert.Nil(t, vm.Run())
 
 	result := vm.stack.Pop().(int)
-	assert.Equal(t, result, 2)
+	assert.Equal(t, result, 4)
 }
