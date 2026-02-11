@@ -7,17 +7,16 @@ import (
 
 type Hash [32]uint8
 
-func (h *Hash) IsZero() bool {
+func (h Hash) IsZero() bool {
 	for i := 0; i < 32; i++ {
 		if h[i] != 0 {
 			return false
 		}
 	}
-
 	return true
 }
 
-func (h *Hash) ToSlice() []byte {
+func (h Hash) ToSlice() []byte {
 	b := make([]byte, 32)
 	for i := 0; i < 32; i++ {
 		b[i] = h[i]
@@ -31,7 +30,7 @@ func (h Hash) String() string {
 
 func HashFromBytes(b []byte) Hash {
 	if len(b) != 32 {
-		msg := fmt.Sprintf("Given Bytes with length %d should be 32", len(b))
+		msg := fmt.Sprintf("given bytes with length %d should be 32", len(b))
 		panic(msg)
 	}
 

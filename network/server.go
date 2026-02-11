@@ -93,8 +93,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 
 func (s *Server) bootstrapNetwork() {
 	for _, addr := range s.SeedNodes {
-
-		fmt.Println("Trying to connect to ", addr)
+		fmt.Println("trying to connect to ", addr)
 
 		go func(addr string) {
 			conn, err := net.Dial("tcp", addr)
@@ -111,14 +110,13 @@ func (s *Server) bootstrapNetwork() {
 }
 
 func (s *Server) Start() {
-
 	s.TCPTransport.Start()
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second * 1)
 
 	s.bootstrapNetwork()
 
-	s.Logger.Log("msg", "acceptingTCP connections on", "addr", s.ListenAddr, "id", s.ID)
+	s.Logger.Log("msg", "accepting TCP connection on", "addr", s.ListenAddr, "id", s.ID)
 
 free:
 	for {
@@ -129,7 +127,7 @@ free:
 			go peer.readLoop(s.rpcCh)
 
 			if err := s.sendGetStatusMessage(peer); err != nil {
-				s.Logger.Log("error", err)
+				s.Logger.Log("err", err)
 				continue
 			}
 
@@ -186,28 +184,16 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 	return nil
 }
 
-func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error {
-	s.Logger.Log("msg", "RECEIVED bLOCKS!!!", "from", from)
-
-	for _, block := range data.Blocks {
-		fmt.Printf("BLOCK with header => %+v\n", block.Header)
-		if err := s.chain.AddBlock(block); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) error {
 	s.Logger.Log("msg", "received getBlocks message", "from", from)
+
 	var (
 		blocks    = []*core.Block{}
 		ourHeight = s.chain.Height()
 	)
 
 	if data.To == 0 {
-		for i := 0; i < int(ourHeight); i++ {
+		for i := int(data.From); i <= int(ourHeight); i++ {
 			block, err := s.chain.GetBlock(uint32(i))
 			if err != nil {
 				return err
@@ -216,7 +202,6 @@ func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) 
 			blocks = append(blocks, block)
 		}
 	}
-	fmt.Printf("BLOCK 0 %+v\n", blocks[0])
 
 	blocksMsg := &BlocksMessage{
 		Blocks: blocks,
@@ -233,14 +218,12 @@ func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) 
 	msg := NewMessage(MessageTypeBlocks, buf.Bytes())
 	peer, ok := s.peerMap[from]
 	if !ok {
-		fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
+		return fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
 	}
-	return peer.Send(msg.Bytes())
 
+	return peer.Send(msg.Bytes())
 }
 
-// TODO(@anthdm): Remove the logic from the main function to here
-// Normally Transport which is our own transport should do the trick.
 func (s *Server) sendGetStatusMessage(peer *TCPPeer) error {
 	var (
 		getStatusMsg = new(GetStatusMessage)
@@ -262,40 +245,38 @@ func (s *Server) broadcast(payload []byte) error {
 			fmt.Printf("peer send error => addr %s [err: %s]\n", netAddr, err)
 		}
 	}
+
+	return nil
+}
+
+func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error {
+	s.Logger.Log("msg", "received BLOCKS!!!!!!!!", "from", from)
+
+	for _, block := range data.Blocks {
+		if err := s.chain.AddBlock(block); err != nil {
+			fmt.Printf("adding block error %s\n", err)
+			continue
+		}
+	}
+
 	return nil
 }
 
 func (s *Server) processStatusMessage(from net.Addr, data *StatusMessage) error {
-	s.Logger.Log("msg", "received a STATUS message", "from", from)
+	s.Logger.Log("msg", "received STATUS message", "from", from)
+
 	if data.CurrentHeight <= s.chain.Height() {
 		s.Logger.Log("msg", "cannot sync blockHeight to low", "ourHeight", s.chain.Height(), "theirHeight", data.CurrentHeight, "addr", from)
 		return nil
 	}
 
-	// In this case we are 100% sure that the node has blocks heigher than us.
-	getBlocksMessage := &GetBlocksMessage{
-		From: s.chain.Height(),
-		To:   0,
-	}
+	go s.requestBlocksLoop(from)
 
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
-		return err
-	}
-
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
-	peer, ok := s.peerMap[from]
-	if !ok {
-		fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
-	}
-	return peer.Send(msg.Bytes())
+	return nil
 }
 
 func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) error {
-	s.Logger.Log("msg", "received get status message", "from", from)
+	s.Logger.Log("msg", "received getStatus message", "from", from)
 
 	statusMessage := &StatusMessage{
 		CurrentHeight: s.chain.Height(),
@@ -312,9 +293,11 @@ func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) 
 
 	peer, ok := s.peerMap[from]
 	if !ok {
-		fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
+		return fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
 	}
+
 	msg := NewMessage(MessageTypeStatus, buf.Bytes())
+
 	return peer.Send(msg.Bytes())
 }
 
@@ -350,6 +333,44 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	s.mempool.Add(tx)
 
 	return nil
+}
+
+// TODO: Find a way to make sure we dont keep syncing when we are at the highest
+// block height in the network.
+func (s *Server) requestBlocksLoop(peer net.Addr) error {
+	ticker := time.NewTicker(3 * time.Second)
+
+	for {
+		ourHeight := s.chain.Height()
+
+		s.Logger.Log("msg", "requesting new blocks", "requesting height", ourHeight+1)
+
+		// In this case we are 100% sure that the node has blocks heigher than us.
+		getBlocksMessage := &GetBlocksMessage{
+			From: ourHeight + 1,
+			To:   0,
+		}
+
+		buf := new(bytes.Buffer)
+		if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
+			return err
+		}
+
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+
+		msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
+		peer, ok := s.peerMap[peer]
+		if !ok {
+			return fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
+		}
+
+		if err := peer.Send(msg.Bytes()); err != nil {
+			s.Logger.Log("error", "failed to send to peer", "err", err, "peer", peer)
+		}
+
+		<-ticker.C
+	}
 }
 
 func (s *Server) broadcastBlock(b *core.Block) error {
@@ -417,5 +438,11 @@ func genesisBlock() *core.Block {
 	}
 
 	b, _ := core.NewBlock(header, nil)
+
+	privKey := crypto.GeneratePrivateKey()
+	if err := b.Sign(privKey); err != nil {
+		panic(err)
+	}
+
 	return b
 }

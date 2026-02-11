@@ -7,7 +7,9 @@ type State struct {
 }
 
 func NewState() *State {
-	return &State{data: make(map[string][]byte)}
+	return &State{
+		data: make(map[string][]byte),
+	}
 }
 
 func (s *State) Put(k, v []byte) error {
@@ -24,7 +26,8 @@ func (s *State) Delete(k []byte) error {
 
 func (s *State) Get(k []byte) ([]byte, error) {
 	key := string(k)
-	value, ok := s.data[string(k)]
+
+	value, ok := s.data[key]
 	if !ok {
 		return nil, fmt.Errorf("given key %s not found", key)
 	}

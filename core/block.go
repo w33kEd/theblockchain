@@ -15,19 +15,8 @@ type Header struct {
 	Version       uint32
 	DataHash      types.Hash
 	PrevBlockHash types.Hash
-	Timestamp     int64
 	Height        uint32
-	Nonce         uint64
-}
-
-type Block struct {
-	*Header
-	Transactions []*Transaction
-	Validator    crypto.PublicKey
-	Signature    *crypto.Signature
-
-	// cached version of block hash
-	hash types.Hash
+	Timestamp     int64
 }
 
 func (h *Header) Bytes() []byte {
@@ -36,6 +25,17 @@ func (h *Header) Bytes() []byte {
 	enc.Encode(h)
 
 	return buf.Bytes()
+}
+
+type Block struct {
+	*Header
+
+	Transactions []*Transaction
+	Validator    crypto.PublicKey
+	Signature    *crypto.Signature
+
+	// Cached version of the header hash
+	hash types.Hash
 }
 
 func NewBlock(h *Header, txx []*Transaction) (*Block, error) {
@@ -108,8 +108,8 @@ func (b *Block) Decode(dec Decoder[*Block]) error {
 	return dec.Decode(b)
 }
 
-func (b *Block) Encode(dec Encoder[*Block]) error {
-	return dec.Encode(b)
+func (b *Block) Encode(enc Encoder[*Block]) error {
+	return enc.Encode(b)
 }
 
 func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
@@ -125,11 +125,11 @@ func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
 
 	for _, tx := range txx {
 		if err = tx.Encode(NewGobTxEncoder(buf)); err != nil {
-			return types.Hash{}, err
+			return
 		}
 	}
 
 	hash = sha256.Sum256(buf.Bytes())
 
-	return hash, nil
+	return
 }

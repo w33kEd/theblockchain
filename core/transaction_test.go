@@ -8,7 +8,7 @@ import (
 	"github.com/w33ked/theblockchain/crypto"
 )
 
-func TestTransaction(t *testing.T) {
+func TestSignTransaction(t *testing.T) {
 	privKey := crypto.GeneratePrivateKey()
 	tx := &Transaction{
 		Data: []byte("foo"),
@@ -16,7 +16,6 @@ func TestTransaction(t *testing.T) {
 
 	assert.Nil(t, tx.Sign(privKey))
 	assert.NotNil(t, tx.Signature)
-
 }
 
 func TestVerifyTransaction(t *testing.T) {
@@ -34,15 +33,6 @@ func TestVerifyTransaction(t *testing.T) {
 	assert.NotNil(t, tx.Verify())
 }
 
-func randomTxWithSignature(t *testing.T) *Transaction {
-	privKey := crypto.GeneratePrivateKey()
-	tx := Transaction{
-		Data: []byte("foo"),
-	}
-	assert.Nil(t, tx.Sign(privKey))
-	return &tx
-}
-
 func TestTxEncodeDecode(t *testing.T) {
 	tx := randomTxWithSignature(t)
 	buf := &bytes.Buffer{}
@@ -51,4 +41,14 @@ func TestTxEncodeDecode(t *testing.T) {
 	txDecoded := new(Transaction)
 	assert.Nil(t, txDecoded.Decode(NewGobTxDecoder(buf)))
 	assert.Equal(t, tx, txDecoded)
+}
+
+func randomTxWithSignature(t *testing.T) *Transaction {
+	privKey := crypto.GeneratePrivateKey()
+	tx := Transaction{
+		Data: []byte("foo"),
+	}
+	assert.Nil(t, tx.Sign(privKey))
+
+	return &tx
 }

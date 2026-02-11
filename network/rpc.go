@@ -12,11 +12,6 @@ import (
 	"github.com/w33ked/theblockchain/core"
 )
 
-type RPC struct {
-	From    net.Addr
-	Payload io.Reader
-}
-
 type MessageType byte
 
 const (
@@ -27,6 +22,11 @@ const (
 	MessageTypeGetStatus MessageType = 0x5
 	MessageTypeBlocks    MessageType = 0x6
 )
+
+type RPC struct {
+	From    net.Addr //string
+	Payload io.Reader
+}
 
 type Message struct {
 	Header MessageType
@@ -59,10 +59,12 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
 	}
 
+	// fmt.Printf("receiving message: %+v\n", msg)
+
 	logrus.WithFields(logrus.Fields{
 		"from": rpc.From,
 		"type": msg.Header,
-	}).Debug("new incomming message")
+	}).Debug("new incoming message")
 
 	switch msg.Header {
 	case MessageTypeTx:
@@ -75,6 +77,7 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: tx,
 		}, nil
+
 	case MessageTypeBlock:
 		block := new(core.Block)
 		if err := block.Decode(core.NewGobBlockDecoder(bytes.NewReader(msg.Data))); err != nil {
@@ -85,12 +88,13 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: block,
 		}, nil
+
 	case MessageTypeGetStatus:
-		getStatusMessage := new(GetStatusMessage)
 		return &DecodedMessage{
 			From: rpc.From,
-			Data: getStatusMessage,
+			Data: &GetStatusMessage{},
 		}, nil
+
 	case MessageTypeStatus:
 		statusMessage := new(StatusMessage)
 		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(statusMessage); err != nil {
@@ -101,6 +105,7 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: statusMessage,
 		}, nil
+
 	case MessageTypeGetBlocks:
 		getBlocks := new(GetBlocksMessage)
 		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(getBlocks); err != nil {
@@ -111,6 +116,7 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: getBlocks,
 		}, nil
+
 	case MessageTypeBlocks:
 		blocks := new(BlocksMessage)
 		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(blocks); err != nil {
@@ -121,8 +127,9 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: blocks,
 		}, nil
+
 	default:
-		return nil, fmt.Errorf("Invalid message header %x", msg.Header)
+		return nil, fmt.Errorf("invalid message header %x", msg.Header)
 	}
 }
 
@@ -132,5 +139,4 @@ type RPCProcessor interface {
 
 func init() {
 	gob.Register(elliptic.P256())
-
 }

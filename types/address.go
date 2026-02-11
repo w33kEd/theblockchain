@@ -7,10 +7,6 @@ import (
 
 type Address [20]uint8
 
-func (a Address) String() string {
-	return hex.EncodeToString(a.ToSlice())
-}
-
 func (a Address) ToSlice() []byte {
 	b := make([]byte, 20)
 	for i := 0; i < 20; i++ {
@@ -19,9 +15,13 @@ func (a Address) ToSlice() []byte {
 	return b
 }
 
+func (a Address) String() string {
+	return hex.EncodeToString(a.ToSlice())
+}
+
 func AddressFromBytes(b []byte) Address {
 	if len(b) != 20 {
-		msg := fmt.Sprintf("Given Bytes with length %d should be 32", len(b))
+		msg := fmt.Sprintf("given bytes with length %d should be 20", len(b))
 		panic(msg)
 	}
 

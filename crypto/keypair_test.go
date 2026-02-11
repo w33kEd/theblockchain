@@ -6,28 +6,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKeyPair_Sign_Verify_Valid(t *testing.T) {
+func TestKeypairSignVerifySuccess(t *testing.T) {
 	privKey := GeneratePrivateKey()
 	publicKey := privKey.PublicKey()
-	msg := []byte("Hello")
+	msg := []byte("hello world")
 
 	sig, err := privKey.Sign(msg)
-
 	assert.Nil(t, err)
+
 	assert.True(t, sig.Verify(publicKey, msg))
 }
 
-func TestKeyPair_Sign_Verify_Fail(t *testing.T) {
+func TestKeypairSignVerifyFail(t *testing.T) {
 	privKey := GeneratePrivateKey()
 	publicKey := privKey.PublicKey()
-	msg := []byte("Hello")
+	msg := []byte("hello world")
 
 	sig, err := privKey.Sign(msg)
 	assert.Nil(t, err)
 
 	otherPrivKey := GeneratePrivateKey()
-	otherPubKey := otherPrivKey.PublicKey()
+	otherPublicKey := otherPrivKey.PublicKey()
 
-	assert.False(t, sig.Verify(otherPubKey, msg))
-	assert.False(t, sig.Verify(publicKey, []byte("invalid_msg")))
+	assert.False(t, sig.Verify(otherPublicKey, msg))
+	assert.False(t, sig.Verify(publicKey, []byte("xxxxxx")))
 }
