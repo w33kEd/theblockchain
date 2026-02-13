@@ -51,7 +51,7 @@ func (k PublicKey) Address() types.Address {
 }
 
 type Signature struct {
-	S *big.Int 
+	S *big.Int
 	R *big.Int
 }
 

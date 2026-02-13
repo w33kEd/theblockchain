@@ -5,15 +5,17 @@ import (
 	"sync"
 
 	"github.com/go-kit/log"
+	"github.com/w33ked/theblockchain/types"
 )
 
 type Blockchain struct {
-	logger    log.Logger
-	store     Storage
-	lock      sync.RWMutex
-	headers   []*Header
-	blocks    []*Block
-	validator Validator
+	logger     log.Logger
+	store      Storage
+	lock       sync.RWMutex
+	headers    []*Header
+	blocks     []*Block
+	blockStore map[types.Hash]*Block
+	validator  Validator
 	// TODO: make this an interface.
 	contractState *State
 }
@@ -24,6 +26,7 @@ func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 		headers:       []*Header{},
 		store:         NewMemorystore(),
 		logger:        l,
+		blockStore:    make(map[types.Hash]*Block),
 	}
 	bc.validator = NewBlockValidator(bc)
 	err := bc.addBlockWithoutValidation(genesis)
@@ -50,6 +53,16 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 	}
 
 	return bc.addBlockWithoutValidation(b)
+}
+
+func (bc *Blockchain) GetBlockByHash(hash types.Hash) (*Block, error) {
+	block, ok := bc.blockStore[hash]
+
+	if !ok {
+		return nil, fmt.Errorf("block with hash (%S) not found", hash)
+	}
+
+	return block, nil
 }
 
 func (bc *Blockchain) GetBlock(height uint32) (*Block, error) {
@@ -91,6 +104,7 @@ func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
 	bc.lock.Lock()
 	bc.headers = append(bc.headers, b.Header)
 	bc.blocks = append(bc.blocks, b)
+	bc.blockStore[b.Hash(BlockHasher{})] = b
 	bc.lock.Unlock()
 
 	bc.logger.Log(
