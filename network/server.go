@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log"
+	"github.com/w33ked/theblockchain/api"
 	"github.com/w33ked/theblockchain/core"
 	"github.com/w33ked/theblockchain/crypto"
 	"github.com/w33ked/theblockchain/types"
@@ -18,6 +19,7 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
+	APIListenAddr string
 	SeedNodes     []string
 	ListenAddr    string
 	TCPTransport  *TCPTransport
@@ -60,6 +62,22 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// boot rpc
+	if len(opts.APIListenAddr) > 0 {
+
+		apiServerCfg := api.ServerConfig{
+			Logger:     opts.Logger,
+			ListenAddr: opts.APIListenAddr,
+		}
+
+		apiServer := api.NewServer(apiServerCfg, chain)
+	
+		go apiServer.Start()
+
+		opts.Logger.Log("msg", "JSON API Server Running", "Port", opts.APIListenAddr)
+	}
+
 
 	peerCh := make(chan *TCPPeer)
 	tr := NewTCPTransport(opts.ListenAddr, peerCh)
