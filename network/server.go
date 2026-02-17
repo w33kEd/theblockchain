@@ -44,6 +44,7 @@ type Server struct {
 	isValidator bool
 	rpcCh       chan RPC
 	quitCh      chan struct{}
+	txChan      chan *core.Transaction
 }
 
 func NewServer(opts ServerOpts) (*Server, error) {
@@ -63,7 +64,11 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		return nil, err
 	}
 
-	// boot rpc
+	// chan used to communicate between the JSON RPC server
+	// and the node that will process this message
+	txChan := make(chan *core.Transaction)
+
+	// boot rpc server
 	if len(opts.APIListenAddr) > 0 {
 
 		apiServerCfg := api.ServerConfig{
@@ -71,13 +76,12 @@ func NewServer(opts ServerOpts) (*Server, error) {
 			ListenAddr: opts.APIListenAddr,
 		}
 
-		apiServer := api.NewServer(apiServerCfg, chain)
-	
+		apiServer := api.NewServer(apiServerCfg, chain, txChan)
+
 		go apiServer.Start()
 
 		opts.Logger.Log("msg", "JSON API Server Running", "Port", opts.APIListenAddr)
 	}
-
 
 	peerCh := make(chan *TCPPeer)
 	tr := NewTCPTransport(opts.ListenAddr, peerCh)
@@ -92,6 +96,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		isValidator:  opts.PrivateKey != nil,
 		rpcCh:        make(chan RPC),
 		quitCh:       make(chan struct{}, 1),
+		txChan:       txChan,
 	}
 
 	s.TCPTransport.peerCh = peerCh
@@ -151,10 +156,15 @@ free:
 
 			s.Logger.Log("msg", "peer added to the server", "outgoing", peer.Outgoing, "addr", peer.conn.RemoteAddr())
 
+		case tx := <-s.txChan:
+			if err := s.processTransaction(tx); err != nil {
+				s.Logger.Log("process Tx error", err)
+			}
+
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {
-				s.Logger.Log("error", err)
+				s.Logger.Log("RPC error", err)
 				continue
 			}
 
