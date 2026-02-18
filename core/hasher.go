@@ -1,8 +1,9 @@
 package core
 
 import (
+	"bytes"
 	"crypto/sha256"
-	"encoding/binary"
+	"encoding/gob"
 
 	"github.com/w33ked/theblockchain/types"
 )
@@ -20,10 +21,12 @@ func (BlockHasher) Hash(b *Header) types.Hash {
 
 type TxHasher struct{}
 
+// will hash the whole bytes of tx
 func (TxHasher) Hash(tx *Transaction) types.Hash {
-	buf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(buf, uint64(tx.Nonce))
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(tx); err != nil {
+		panic(err)
+	}
 
-	data := append(buf, tx.Data...)
-	return types.Hash(sha256.Sum256(data))
+	return types.Hash(sha256.Sum256(buf.Bytes()))
 }
