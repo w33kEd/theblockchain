@@ -17,6 +17,8 @@ type Blockchain struct {
 	txStore    map[types.Hash]*Transaction
 	blockStore map[types.Hash]*Block
 
+	accountState *AccountState
+
 	stateLock       sync.RWMutex
 	collectionState map[types.Hash]*CollectionTx
 	mintState       map[types.Hash]*MintTx
@@ -31,6 +33,7 @@ func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 		headers:         []*Header{},
 		store:           NewMemorystore(),
 		logger:          l,
+		accountState:    NewAccountState(),
 		collectionState: make(map[types.Hash]*CollectionTx),
 		mintState:       make(map[types.Hash]*MintTx),
 		blockStore:      make(map[types.Hash]*Block),
@@ -73,12 +76,21 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 
 		// handle native transaction here
 		if tx.Value > 0 {
-			fmt.Printf("handling native transfer of Value: (%d) From: (%s) To: (%s)\n", tx.Value, tx.From.Address(), tx.To.Address())
+			if err := bc.handleNativeTransfer(tx); err != nil {
+				return err
+			}
 		}
 
 	}
 
 	return bc.addBlockWithoutValidation(b)
+}
+
+func (bc *Blockchain) handleNativeTransfer(tx *Transaction) error {
+	bc.logger.Log("msg", "handling native transfer", "From", tx.From.Address(), "To", tx.To.Address(), "Value", tx.Value)
+
+	return bc.accountState.Transfer(tx.From.Address(), tx.To.Address(), tx.Value)
+
 }
 
 func (bc *Blockchain) handleNativeNFT(tx *Transaction) error {
