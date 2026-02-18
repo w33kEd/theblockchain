@@ -282,8 +282,7 @@ func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error 
 
 	for _, block := range data.Blocks {
 		if err := s.chain.AddBlock(block); err != nil {
-			fmt.Printf("adding block error %s\n", err)
-			continue
+			return err
 		}
 	}
 

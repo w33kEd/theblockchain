@@ -83,6 +83,8 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 
 	}
 
+	fmt.Printf("%+v\n", bc.accountState)
+
 	return bc.addBlockWithoutValidation(b)
 }
 
