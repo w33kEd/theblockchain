@@ -30,31 +30,24 @@ func TestSendNativeTransferTamper(t *testing.T) {
 	tx.To = privKeyAlice.PublicKey()
 	tx.Value = amount
 	tx.Sign(privKeyBob)
+	tx.hash = types.Hash{} // reset the hash to force rehashing
 
 	hackerPrivKey := crypto.GeneratePrivateKey()
 	tx.To = hackerPrivKey.PublicKey()
 
+	fmt.Printf("Bob => %s\n", privKeyBob.PublicKey().Address())
+	fmt.Printf("Alice => %s\n", privKeyAlice.PublicKey().Address())
+	fmt.Printf("Hacker => %s\n", hackerPrivKey.PublicKey().Address())
+
 	block.AddTransaction(tx)
+	assert.NotNil(t, bc.AddBlock(block)) // this should fail
 
-	assert.Nil(t, bc.AddBlock(block)) // this should fail
-
-	//fmt.Printf("%+v\n", hackerPrivKey.PublicKey().Address())
-	fmt.Printf("%+v\n", bc.accountState.accounts)
-	fmt.Printf("%+v\n", privKeyAlice.PublicKey().Address())
-
-	accountHacker, err := bc.accountState.GetAccount(hackerPrivKey.PublicKey().Address())
-	assert.NotNil(t, err)
-
-	assert.Equal(t, uint64(0), accountHacker.Balance)
-
-	_, err = bc.accountState.GetAccount(privKeyAlice.PublicKey().Address())
-	assert.NotNil(t, err)
-	// assert.Equal(t, accountAlice.Balance, amount)
+	_, err := bc.accountState.GetAccount(hackerPrivKey.PublicKey().Address())
+	assert.Equal(t, ErrAccountNotFound, err)
 }
 
 func TestSendNativeTransferInsuffientBalance(t *testing.T) {
 	bc := newBlockchainWithGenesis(t)
-
 	signer := crypto.GeneratePrivateKey()
 
 	block := randomBlock(t, uint32(1), getPrevBlockHash(t, bc, uint32(1)))
@@ -72,10 +65,20 @@ func TestSendNativeTransferInsuffientBalance(t *testing.T) {
 	tx.To = privKeyAlice.PublicKey()
 	tx.Value = amount
 	tx.Sign(privKeyBob)
+	tx.hash = types.Hash{} // reset the hash to force rehashing
+
+	fmt.Printf("Alice => %s\n", privKeyAlice.PublicKey().Address())
+	fmt.Printf("Bob => %s\n", privKeyBob.PublicKey().Address())
+
 	block.AddTransaction(tx)
-	assert.NotNil(t, bc.AddBlock(block))
+	assert.Nil(t, bc.AddBlock(block))
+
 
 	_, err := bc.accountState.GetAccount(privKeyAlice.PublicKey().Address())
+	assert.NotNil(t, err)
+
+	hash := tx.Hash(TxHasher{})
+	_, err = bc.GetTxByHash(hash)
 	assert.NotNil(t, err)
 }
 
@@ -100,6 +103,7 @@ func TestSendNativeTransferSuccess(t *testing.T) {
 	tx.Value = amount
 	tx.Sign(privKeyBob)
 	block.AddTransaction(tx)
+
 	assert.Nil(t, bc.AddBlock(block))
 
 	accountAlice, err := bc.accountState.GetAccount(privKeyAlice.PublicKey().Address())
