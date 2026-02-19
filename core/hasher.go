@@ -21,7 +21,7 @@ func (BlockHasher) Hash(b *Header) types.Hash {
 
 type TxHasher struct{}
 
-// will hash the whole bytes of tx
+// Hash will hash the whole bytes of the TX no exception.
 func (TxHasher) Hash(tx *Transaction) types.Hash {
 	buf := new(bytes.Buffer)
 	if err := gob.NewEncoder(buf).Encode(tx); err != nil {

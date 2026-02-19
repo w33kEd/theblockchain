@@ -34,10 +34,10 @@ func TestNativeTransferTransaction(t *testing.T) {
 	toPrivKey := crypto.GeneratePrivateKey()
 	tx := &Transaction{
 		To:    toPrivKey.PublicKey(),
-		Value: 100,
+		Value: 666,
 	}
-	assert.Nil(t, tx.Sign(fromPrivKey))
 
+	assert.Nil(t, tx.Sign(fromPrivKey))
 }
 
 func TestSignTransaction(t *testing.T) {

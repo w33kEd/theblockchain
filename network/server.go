@@ -64,23 +64,20 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		return nil, err
 	}
 
-	// chan used to communicate between the JSON RPC server
-	// and the node that will process this message
+	// Channel being used to communicate between the JSON RPC server
+	// and the node that will process this message.
 	txChan := make(chan *core.Transaction)
 
-	// boot rpc server
+	// Only boot up the API server if the config has a valid port number.
 	if len(opts.APIListenAddr) > 0 {
-
 		apiServerCfg := api.ServerConfig{
 			Logger:     opts.Logger,
 			ListenAddr: opts.APIListenAddr,
 		}
-
 		apiServer := api.NewServer(apiServerCfg, chain, txChan)
-
 		go apiServer.Start()
 
-		opts.Logger.Log("msg", "JSON API Server Running", "Port", opts.APIListenAddr)
+		opts.Logger.Log("msg", "JSON API server running", "port", opts.APIListenAddr)
 	}
 
 	peerCh := make(chan *TCPPeer)
@@ -158,7 +155,7 @@ free:
 
 		case tx := <-s.txChan:
 			if err := s.processTransaction(tx); err != nil {
-				s.Logger.Log("process Tx error", err)
+				s.Logger.Log("process TX error", err)
 			}
 
 		case rpc := <-s.rpcCh:
@@ -188,8 +185,13 @@ func (s *Server) validatorLoop() {
 	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
 	for {
+		fmt.Println("creating new block")
+
+		if err := s.createNewBlock(); err != nil {
+			s.Logger.Log("create block error", err)
+		}
+
 		<-ticker.C
-		s.createNewBlock()
 	}
 }
 
@@ -282,6 +284,7 @@ func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error 
 
 	for _, block := range data.Blocks {
 		if err := s.chain.AddBlock(block); err != nil {
+			s.Logger.Log("error", err.Error())
 			return err
 		}
 	}
@@ -330,6 +333,7 @@ func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) 
 
 func (s *Server) processBlock(b *core.Block) error {
 	if err := s.chain.AddBlock(b); err != nil {
+		s.Logger.Log("error", err.Error())
 		return err
 	}
 
@@ -465,6 +469,13 @@ func genesisBlock() *core.Block {
 	}
 
 	b, _ := core.NewBlock(header, nil)
+
+	coinbase := crypto.PublicKey{}
+	tx := core.NewTransaction(nil)
+	tx.From = coinbase
+	tx.To = coinbase
+	tx.Value = 10_000_000
+	b.Transactions = append(b.Transactions, tx)
 
 	privKey := crypto.GeneratePrivateKey()
 	if err := b.Sign(privKey); err != nil {

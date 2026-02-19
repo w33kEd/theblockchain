@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"math/big"
 
 	"github.com/w33ked/theblockchain/types"
@@ -27,8 +28,8 @@ func (k PrivateKey) Sign(data []byte) (*Signature, error) {
 	}, nil
 }
 
-func GeneratePrivateKey() PrivateKey {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+func NewPrivateKeyFromReader(r io.Reader) PrivateKey {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), r)
 	if err != nil {
 		panic(err)
 	}
@@ -38,13 +39,17 @@ func GeneratePrivateKey() PrivateKey {
 	}
 }
 
+func GeneratePrivateKey() PrivateKey {
+	return NewPrivateKeyFromReader(rand.Reader)
+}
+
 func (k PrivateKey) PublicKey() PublicKey {
 	return elliptic.MarshalCompressed(k.key.PublicKey, k.key.PublicKey.X, k.key.PublicKey.Y)
 }
 
 type PublicKey []byte
 
-func(k PublicKey) String() string {
+func (k PublicKey) String() string {
 	return hex.EncodeToString(k)
 }
 
@@ -59,17 +64,9 @@ type Signature struct {
 	R *big.Int
 }
 
-func (sig *Signature) String() string {
+func (sig Signature) String() string {
 	b := append(sig.S.Bytes(), sig.R.Bytes()...)
-
 	return hex.EncodeToString(b)
-	// buf := new(bytes.Buffer)
-	// buf.Read(sig.S.Bytes())
-	// buf.Read(sig.R.Bytes())
-
-	// fmt.Println("==================>", buf.Len())
-
-	// return buf.String()
 }
 
 func (sig Signature) Verify(pubKey PublicKey, data []byte) bool {

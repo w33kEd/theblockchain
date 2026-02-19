@@ -30,7 +30,8 @@ type Block struct {
 	Timestamp     int64
 	Validator     string
 	Signature     string
-	TxResponse    TxResponse
+
+	TxResponse TxResponse
 }
 
 type ServerConfig struct {
@@ -67,7 +68,6 @@ func (s *Server) handlePostTx(c echo.Context) error {
 	if err := gob.NewDecoder(c.Request().Body).Decode(tx); err != nil {
 		return c.JSON(http.StatusBadRequest, APIError{Error: err.Error()})
 	}
-
 	s.txChan <- tx
 
 	return nil
@@ -87,13 +87,13 @@ func (s *Server) handleGetTx(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, tx)
-
 }
 
 func (s *Server) handleGetBlock(c echo.Context) error {
-	hashOrId := c.Param("hashorid")
-	height, err := strconv.Atoi(hashOrId)
-	// if err is nil we can assume the height of the block is given
+	hashOrID := c.Param("hashorid")
+
+	height, err := strconv.Atoi(hashOrID)
+	// If the error is nil we can assume the height of the block is given.
 	if err == nil {
 		block, err := s.bc.GetBlock(uint32(height))
 		if err != nil {
@@ -103,8 +103,8 @@ func (s *Server) handleGetBlock(c echo.Context) error {
 		return c.JSON(http.StatusOK, intoJSONBlock(block))
 	}
 
-	// oherwise assume it is the hash
-	b, err := hex.DecodeString(hashOrId)
+	// otherwise assume its the hash
+	b, err := hex.DecodeString(hashOrID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, APIError{Error: err.Error()})
 	}
@@ -129,10 +129,10 @@ func intoJSONBlock(block *core.Block) Block {
 
 	return Block{
 		Hash:          block.Hash(core.BlockHasher{}).String(),
-		Version:       block.Version,
+		Version:       block.Header.Version,
 		Height:        block.Header.Height,
 		DataHash:      block.Header.DataHash.String(),
-		PrevBlockHash: block.DataHash.String(),
+		PrevBlockHash: block.Header.PrevBlockHash.String(),
 		Timestamp:     block.Header.Timestamp,
 		Validator:     block.Validator.Address().String(),
 		Signature:     block.Signature.String(),
